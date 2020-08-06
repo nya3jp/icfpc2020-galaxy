@@ -1,0 +1,11 @@
+[package]
+name = "icfpc2020-galaxy"
+version = "0.1.0"
+authors = ["Shuhei Takahashi <takahashi.shuhei@gmail.com>"]
+edition = "2018"
+
+[profile.release]
+debug = true
+
+[dependencies]
+anyhow = "1.0.31"
