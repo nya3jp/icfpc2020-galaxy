@@ -43,9 +43,9 @@ fn main() -> Result<()> {
         println!("y={}", y);
         for x in -100..=100 {
             let point = Point { x, y };
-            let result = eval.to_value(main.apply(state.clone())?.apply(point.into())?)?;
-            //result[0].force_modulatable()?;
-            //result[1].force_modulatable()?;
+            let result = eval.to_list(main.apply(state.clone())?.apply(point.into())?)?;
+            eval.to_modulatable(result[0].clone())?;
+            eval.to_modulatable(result[1].clone())?;
         }
     }
 
