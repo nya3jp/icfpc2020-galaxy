@@ -444,19 +444,11 @@ pub fn define_builtins(env: &mut Env) -> Result<()> {
         ),
         (
             "c",
-            Value::new_func3(|a, b, c| {
-                Ok(Expr::new_thunk(move |eval| {
-                    eval.to_value(a.apply(c.clone())?.apply(b.clone())?)
-                }))
-            }),
+            Value::new_func3(|a, b, c| a.apply(c.clone())?.apply(b.clone())),
         ),
         (
             "b",
-            Value::new_func3(|a, b, c| {
-                Ok(Expr::new_thunk(move |eval| {
-                    eval.to_value(a.apply(b.apply(c.clone())?)?)
-                }))
-            }),
+            Value::new_func3(|a, b, c| a.apply(b.apply(c.clone())?)),
         ),
         ("t", Value::new_bool(true)),
         ("f", Value::new_bool(false)),
