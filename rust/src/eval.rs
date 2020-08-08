@@ -20,16 +20,18 @@ use std::rc::Rc;
 
 use anyhow::{anyhow, bail, Result};
 
+pub type Num = i128;
+
 #[derive(Clone)]
 pub enum Value {
-    Num(i128),
+    Num(Num),
     Nil,
     Cons(Expr, Expr),
     Func(Rc<dyn Fn(Expr) -> Result<Expr>>),
 }
 
 impl Value {
-    pub fn new_num(n: i128) -> Value {
+    pub fn new_num(n: Num) -> Value {
         Value::Num(n)
     }
 
@@ -59,7 +61,7 @@ impl Value {
         })
     }
 
-    pub fn as_num(&self) -> Result<i128> {
+    pub fn as_num(&self) -> Result<Num> {
         if let Value::Num(n) = self {
             return Ok(*n);
         }
@@ -279,7 +281,7 @@ impl Evaluator {
 }
 
 pub enum Modulatable {
-    Num(i128),
+    Num(Num),
     List(Vec<Box<Modulatable>>),
     Cons(Box<Modulatable>, Box<Modulatable>),
 }
@@ -476,8 +478,8 @@ pub fn define_builtins(env: &mut Env) -> Result<()> {
 
 #[derive(Clone, Debug)]
 pub struct Point {
-    pub x: i128,
-    pub y: i128,
+    pub x: Num,
+    pub y: Num,
 }
 
 impl Into<Expr> for Point {
