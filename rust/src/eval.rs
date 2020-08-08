@@ -22,11 +22,14 @@ use anyhow::{anyhow, bail, Result};
 
 pub type Num = i128;
 
+// A partially evaluated value.
 #[derive(Clone)]
 pub enum Value {
     Num(Num),
     Nil,
     Cons(Expr, Expr),
+    // Note: Since Evaluator is not passed to a function, it is not capable of
+    // evaluating thunks.
     Func(Rc<dyn Fn(Expr) -> Result<Expr>>),
 }
 
@@ -109,10 +112,14 @@ impl Value {
 }
 
 enum ExprData {
+    // A partially evaluated value.
     Value(Value),
+    // An unevaluated thunk. A thunk can be evaluated to a value with
+    // Evaluator.
     Thunk(Rc<dyn Fn(&mut Evaluator) -> Result<Value>>),
 }
 
+// An expression that can be a partially evaluated value or a thunk.
 #[derive(Clone)]
 pub struct Expr {
     data: Rc<RefCell<ExprData>>,
@@ -131,7 +138,24 @@ impl Expr {
         }
     }
 
+    pub fn apply(&self, arg: Expr) -> Result<Expr> {
+        // Optimization: if self is a value, apply immediately.
+        let data = self.data.borrow();
+        Ok(match *data {
+            ExprData::Value(ref v) => v.apply(arg)?,
+            _ => {
+                let lhs = self.clone();
+                let rhs = arg;
+                Expr::new_thunk(move |eval| {
+                    let lhs = eval.to_value(lhs.clone())?;
+                    eval.to_value(lhs.apply(rhs.clone())?)
+                })
+            }
+        })
+    }
+
     pub fn car(&self) -> Result<Expr> {
+        // Optimization: if self is a value, compute car immediately.
         let data = self.data.borrow();
         Ok(match *data {
             ExprData::Value(ref v) => v.car()?,
@@ -146,6 +170,7 @@ impl Expr {
     }
 
     pub fn cdr(&self) -> Result<Expr> {
+        // Optimization: if self is a value, compute cdr immediately.
         let data = self.data.borrow();
         Ok(match *data {
             ExprData::Value(ref v) => v.cdr()?,
@@ -176,6 +201,7 @@ impl Expr {
         } else if let Ok(n) = name.parse() {
             Ok((Value::new_num(n).into(), iter))
         } else if let Some(expr) = env.lookup(&name) {
+            // Optimization: if name is already defined, resolve it immediately.
             Ok((expr, iter))
         } else {
             let env = env.clone();
@@ -188,21 +214,6 @@ impl Expr {
             Ok((expr, iter))
         }
     }
-
-    pub fn apply(&self, arg: Expr) -> Result<Expr> {
-        let data = self.data.borrow();
-        Ok(match *data {
-            ExprData::Value(ref v) => v.apply(arg)?,
-            _ => {
-                let lhs = self.clone();
-                let rhs = arg;
-                Expr::new_thunk(move |eval| {
-                    let lhs = eval.to_value(lhs.clone())?;
-                    eval.to_value(lhs.apply(rhs.clone())?)
-                })
-            }
-        })
-    }
 }
 
 impl From<Value> for Expr {
@@ -211,8 +222,10 @@ impl From<Value> for Expr {
     }
 }
 
+// Provides the only way to evaluate thunks to values.
 #[derive(Debug)]
 pub struct Evaluator {
+    // Number of thunks evaluated to values so far.
     pub count: i64,
 }
 
@@ -280,6 +293,7 @@ impl Evaluator {
     }
 }
 
+// Fully evaluated modulatable data.
 pub enum Modulatable {
     Num(Num),
     List(Vec<Box<Modulatable>>),
@@ -307,6 +321,7 @@ struct EnvData {
     defs: HashMap<String, Expr>,
 }
 
+// Holds symbol definitions.
 #[derive(Clone)]
 pub struct Env {
     data: Rc<RefCell<EnvData>>,
@@ -446,10 +461,14 @@ pub fn define_builtins(env: &mut Env) -> Result<()> {
         ),
         (
             "c",
+            // Optimization: evaluate the C combinator eagerly.
+            // Do not evaluate the S combinator eagerly to avoid infinite evaluation loops.
             Value::new_func3(|a, b, c| a.apply(c.clone())?.apply(b.clone())),
         ),
         (
             "b",
+            // Optimization: evaluate the B combinator eagerly.
+            // Do not evaluate the S combinator eagerly to avoid infinite evaluation loops.
             Value::new_func3(|a, b, c| a.apply(b.apply(c.clone())?)),
         ),
         ("t", Value::new_bool(true)),
@@ -476,6 +495,7 @@ pub fn define_builtins(env: &mut Env) -> Result<()> {
         .collect()
 }
 
+// Represents a 2D point.
 #[derive(Clone, Debug)]
 pub struct Point {
     pub x: Num,
