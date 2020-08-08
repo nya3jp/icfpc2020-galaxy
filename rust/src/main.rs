@@ -17,7 +17,7 @@
 mod eval;
 
 use std::fs::File;
-use std::io::prelude::*;
+use std::{time::Instant, io::prelude::*};
 
 use anyhow::Result;
 
@@ -39,6 +39,7 @@ fn main() -> Result<()> {
 
     let mut eval = Evaluator::new();
 
+    let start = Instant::now();
     for y in -100..=100 {
         println!("y={}", y);
         for x in -100..=100 {
@@ -48,7 +49,9 @@ fn main() -> Result<()> {
             eval.to_modulatable(result[1].clone())?;
         }
     }
+    let duration = start.elapsed();
 
+    println!("Time: {:.3}ms", duration.as_secs_f32() * 1000f32);
     println!("Evals: {}", eval.count);
 
     Ok(())
