@@ -558,4 +558,16 @@ mod tests {
         );
         Ok(())
     }
+
+    #[test]
+    fn test_eager_optimization() -> Result<()> {
+        let mut env = Env::new_std();
+        let mut eval = Evaluator::new();
+        env.define(
+            ":1234",
+            Expr::parse(&env, "ap ap c ap ap c i ap :1234 t 0")?,
+        )?;
+        assert_eq!(eval.to_string(Expr::parse(&env, "ap :1234 f")?)?, "0");
+        Ok(())
+    }
 }
