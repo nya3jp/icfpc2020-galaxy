@@ -17,79 +17,72 @@
 
 import {
     Environment,
-    evaluate,
     Expr,
-    isNil,
-    makeApply,
     makeBoolean,
-    makeCar,
-    makeCdr,
-    makeCons,
-    makeFunc,
-    makeFunc2,
-    makeFunc3,
-    makeNil,
-    makeNumber,
-    makeThunk,
+    Thunk,
+    NumberValue,
+    FuncValue,
+    ConsValue,
+    NilValue,
 } from './data';
 
 function builtinInc(a: Expr): Expr {
-    return makeThunk(() => {
-        const x = evaluate(a);
+    return new Thunk((ev) => {
+        const x = ev.forceValue(a);
         if (x.kind !== 'number') {
             throw new Error(`inc: wrong types: ${x.kind}`);
         }
-        return makeNumber(x.number + BigInt(1));
+        return new NumberValue(x.number + BigInt(1));
     });
 }
 
 function builtinDec(a: Expr): Expr {
-    return makeThunk(() => {
-        const x = evaluate(a);
+    return new Thunk((ev) => {
+        const x = ev.forceValue(a);
         if (x.kind !== 'number') {
             throw new Error(`dec: wrong types: ${x.kind}`);
         }
-        return makeNumber(x.number - BigInt(1));
+        return new NumberValue(x.number - BigInt(1));
     });
 }
 
 function builtinAdd(a: Expr, b: Expr): Expr {
-    return makeThunk(() => {
-        const x = evaluate(a);
-        const y = evaluate(b);
+    return new Thunk((ev) => {
+        const x = ev.forceValue(a);
+        const y = ev.forceValue(b);
         if (x.kind !== 'number' || y.kind !== 'number') {
             throw new Error(`add: wrong types: ${x.kind} ${y.kind}`);
         }
-        return makeNumber(x.number + y.number);
+        return new NumberValue(x.number + y.number);
     });
 }
 
 function builtinMul(a: Expr, b: Expr): Expr {
-    return makeThunk(() => {
-        const x = evaluate(a);
-        const y = evaluate(b);
+    return new Thunk((ev) => {
+        const x = ev.forceValue(a);
+        const y = ev.forceValue(b);
         if (x.kind !== 'number' || y.kind !== 'number') {
             throw new Error(`mul: wrong types: ${x.kind} ${y.kind}`);
         }
-        return makeNumber(x.number * y.number);
+        return new NumberValue(x.number * y.number);
     });
 }
 
 function builtinDiv(a: Expr, b: Expr): Expr {
-    return makeThunk(() => {
-        const x = evaluate(a);
-        const y = evaluate(b);
+    return new Thunk((ev) => {
+        const x = ev.forceValue(a);
+        const y = ev.forceValue(b);
         if (x.kind !== 'number' || y.kind !== 'number') {
             throw new Error(`div: wrong types: ${x.kind} ${y.kind}`);
         }
-        return makeNumber(x.number / y.number);
+        return new NumberValue(x.number / y.number);
     });
 }
 
 function builtinEq(a: Expr, b: Expr): Expr {
-    return makeThunk(() => {
-        const x = evaluate(a);
-        const y = evaluate(b);
+    return new Thunk((ev) => {
+        const x = ev.forceValue(a);
+        const y = ev.forceValue(b);
         if (x.kind !== 'number' || y.kind !== 'number') {
             throw new Error(`eq: wrong types: ${x.kind} ${y.kind}`);
         }
@@ -98,9 +91,9 @@ function builtinEq(a: Expr, b: Expr): Expr {
 }
 
 function builtinLt(a: Expr, b: Expr): Expr {
-    return makeThunk(() => {
-        const x = evaluate(a);
-        const y = evaluate(b);
+    return new Thunk((ev) => {
+        const x = ev.forceValue(a);
+        const y = ev.forceValue(b);
         if (x.kind !== 'number' || y.kind !== 'number') {
             throw new Error(`lt: wrong types: ${x.kind} ${y.kind}`);
         }
@@ -109,58 +102,70 @@ function builtinLt(a: Expr, b: Expr): Expr {
 }
 
 function builtinNeg(a: Expr): Expr {
-    return makeThunk(() => {
-        const x = evaluate(a);
+    return new Thunk((ev) => {
+        const x = ev.forceValue(a);
         if (x.kind !== 'number') {
             throw new Error(`neg: wrong types: ${x.kind}`);
         }
-        return makeNumber(-x.number);
+        return new NumberValue(-x.number);
     });
 }
 
 function builtinS(a: Expr, b: Expr, c: Expr): Expr {
-    return makeThunk(() => evaluate(makeApply(makeApply(a, c), makeApply(b, c))));
+    return new Thunk((ev) => ev.forceValue(a.apply(c).apply(b.apply(c))));
 }
 
 function builtinC(a: Expr, b: Expr, c: Expr): Expr {
-    return makeApply(a, c, b);
+    return a.apply(c).apply(b);
 }
 
 function builtinB(a: Expr, b: Expr, c: Expr): Expr {
-    return makeApply(a, makeApply(b, c))
+    return a.apply(b.apply(c));
 }
 
 function builtinI(a: Expr): Expr {
     return a
 }
 
+function builtinCons(car: Expr, cdr: Expr): Expr {
+    return new ConsValue(car, cdr);
+}
+
+function builtinCar(a: Expr): Expr {
+    return a.uncons()[0];
+}
+
+function builtinCdr(a: Expr): Expr {
+    return a.uncons()[1];
+}
+
 function builtinIsNil(a: Expr): Expr {
-    return makeThunk(() => {
-        return makeBoolean(isNil(a));
+    return new Thunk((ev) => {
+        return makeBoolean(ev.forceValue(a).isNil());
     });
 }
 
 function newStandardEnvironment(): Environment {
     const env = new Environment();
-    env.define('inc', makeFunc(builtinInc));
-    env.define('dec', makeFunc(builtinDec));
-    env.define('add', makeFunc2(builtinAdd));
-    env.define('mul', makeFunc2(builtinMul));
-    env.define('div', makeFunc2(builtinDiv));
-    env.define('eq', makeFunc2(builtinEq));
-    env.define('lt', makeFunc2(builtinLt));
-    env.define('neg', makeFunc(builtinNeg));
-    env.define('s', makeFunc3(builtinS));
-    env.define('c', makeFunc3(builtinC));
-    env.define('b', makeFunc3(builtinB));
+    env.define('inc', new FuncValue(builtinInc));
+    env.define('dec', new FuncValue(builtinDec));
+    env.define('add', FuncValue.make2(builtinAdd));
+    env.define('mul', FuncValue.make2(builtinMul));
+    env.define('div', FuncValue.make2(builtinDiv));
+    env.define('eq', FuncValue.make2(builtinEq));
+    env.define('lt', FuncValue.make2(builtinLt));
+    env.define('neg', new FuncValue(builtinNeg));
+    env.define('s', FuncValue.make3(builtinS));
+    env.define('c', FuncValue.make3(builtinC));
+    env.define('b', FuncValue.make3(builtinB));
     env.define('t', makeBoolean(true));
     env.define('f', makeBoolean(false));
-    env.define('i', makeFunc(builtinI));
-    env.define('cons', makeFunc2(makeCons));
-    env.define('car', makeFunc(makeCar));
-    env.define('cdr', makeFunc(makeCdr));
-    env.define('nil', makeNil());
-    env.define('isnil', makeFunc(builtinIsNil));
+    env.define('i', new FuncValue(builtinI));
+    env.define('cons', FuncValue.make2(builtinCons));
+    env.define('car', new FuncValue(builtinCar));
+    env.define('cdr', new FuncValue(builtinCdr));
+    env.define('nil', NilValue.getInstance());
+    env.define('isnil', new FuncValue(builtinIsNil));
     return env;
 }
 

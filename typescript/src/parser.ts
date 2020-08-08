@@ -19,9 +19,8 @@ import {
     Defines,
     Environment,
     Expr,
-    makeApply,
-    makeNumber,
-    makeReference
+    makeReference,
+    NumberValue
 } from './data';
 
 function parseExprIter(env: Environment, tokens: Array<string>): [Expr, Array<string>] {
@@ -29,10 +28,10 @@ function parseExprIter(env: Environment, tokens: Array<string>): [Expr, Array<st
     if (token === 'ap') {
         const [lhs, rest1] = parseExprIter(env, tokens.slice(1));
         const [rhs, rest2] = parseExprIter(env, rest1);
-        return [makeApply(lhs, rhs), rest2];
+        return [lhs.apply(rhs), rest2];
     }
     if (/^-?\d+$/.test(token)) {
-        return [makeNumber(BigInt(token)), tokens.slice(1)];
+        return [new NumberValue(BigInt(token)), tokens.slice(1)];
     }
     return [makeReference(env, token), tokens.slice(1)];
 }
