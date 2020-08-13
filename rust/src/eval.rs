@@ -17,6 +17,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::rc::Weak;
 
 use anyhow::{anyhow, bail, Result};
 
@@ -117,6 +118,8 @@ enum ExprData {
     // An unevaluated thunk. A thunk can be evaluated to a value with
     // Evaluator.
     Thunk(Rc<dyn Fn(&mut Evaluator) -> Result<Value>>),
+    // A reference to a symbol in an environment.
+    Reference(WeakEnv, String),
 }
 
 // An expression that can be a partially evaluated value or a thunk.
@@ -135,6 +138,12 @@ impl Expr {
     pub fn new_thunk(f: impl Fn(&mut Evaluator) -> Result<Value> + 'static) -> Expr {
         Expr {
             data: Rc::new(RefCell::new(ExprData::Thunk(Rc::new(f)))),
+        }
+    }
+
+    pub fn new_reference(env: WeakEnv, name: String) -> Expr {
+        Expr {
+            data: Rc::new(RefCell::new(ExprData::Reference(env, name))),
         }
     }
 
@@ -204,13 +213,7 @@ impl Expr {
             // Optimization: if name is already defined, resolve it immediately.
             Ok((expr, iter))
         } else {
-            let env = env.clone();
-            let expr = Expr::new_thunk(move |eval| {
-                eval.to_value(
-                    env.lookup(&name)
-                        .ok_or_else(|| anyhow!("Undefined symbol {}", &name))?,
-                )
-            });
+            let expr = Expr::new_reference(env.downgrade(), name);
             Ok((expr, iter))
         }
     }
@@ -243,7 +246,11 @@ impl Evaluator {
                 self.count += 1;
                 *data = ExprData::Value(v.clone());
                 v
-            }
+            },
+            ExprData::Reference(ref weak_env, ref name) => {
+                let expr = weak_env.upgrade().lookup(name).ok_or_else(|| anyhow!("Undefined symbol {}", name))?;
+                self.to_value(expr)?
+            },
         })
     }
 
@@ -327,6 +334,11 @@ pub struct Env {
     data: Rc<RefCell<EnvData>>,
 }
 
+#[derive(Clone)]
+pub struct WeakEnv {
+    data: Weak<RefCell<EnvData>>,
+}
+
 impl Env {
     pub fn new() -> Env {
         Env {
@@ -371,6 +383,16 @@ impl Env {
             self.define(v[0], Expr::parse(self, v[1])?)?;
         }
         Ok(())
+    }
+
+    pub fn downgrade(&self) -> WeakEnv {
+        WeakEnv{data: Rc::downgrade(&self.data)}
+    }
+}
+
+impl WeakEnv {
+    pub fn upgrade(&self) -> Env {
+        Env{data: self.data.upgrade().expect("Weak RC broken")}
     }
 }
 
